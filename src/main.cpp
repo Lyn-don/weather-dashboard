@@ -30,6 +30,12 @@ uint16_t co2Concentration = 0;
 float temperature = 0.0;
 float relativeHumidity = 0.0;
 
+
+int by8(int x){
+  return 8*x;
+}
+
+
 void getSensorData(){
    error = sensor.getDataReadyStatus(dataReady);
     if (error != NO_ERROR) {
@@ -109,7 +115,48 @@ void co2Init(){
 
 void page1(){
   if(page_change){
-  
+    display.setCursor(by8(1),by8(6));
+    display.printf("Temp: ");
+    display.setCursor(by8(12), by8(6));
+    display.printf("%f C",temperature);
+    
+    display.setCursor(by8(1),by8(6*2));
+    display.printf("Humidity: ");
+    display.setCursor(by8(12), by8(6*2));
+    display.printf("%f %",relativeHumidity);
+
+    display.setCursor(by8(1),by8(6*3));
+    display.printf("CO2");
+    display.setCursor(by8(12), by8(6*2));
+    display.printf("%d ppm",co2Concentration);
+
+    display.display();
+    //locks in page after change
+    page_change = false;
+  }else{
+    display.fillScreen(GxEPD_WHITE);
+
+    display.setPartialWindow(by8(12), by8(6), display.width()-by8(12), by8(6));
+    display.setCursor(by8(12), by8(6));
+    display.printf("%f C",temperature);
+
+    display.setPartialWindow(by8(12), by8(6*2), display.width()-by8(12), by8(6));
+    display.setCursor(by8(12), by8(6*2));
+    display.printf("%f %",relativeHumidity);
+
+    display.setPartialWindow(by8(12), by8(6*3), display.width()-by8(12), by8(6));
+    display.setCursor(by8(12), by8(6*3));
+    display.printf("%d ppm",co2Concentration);
+
+    display.nextPage();
+    
+  }
+}
+
+void page2(){
+  if(page_change){
+    display.setCursor(by8(1),by8(6));
+    display.printf("Page 2");
     //locks in page after change
     page_change = false;
   }else{
@@ -117,12 +164,15 @@ void page1(){
   }
 }
 
-void page2(){
-
-}
-
 void page3(){
-
+  if(page_change){
+    display.setCursor(by8(1),by8(6));
+    display.printf("Page 3");
+    //locks in page after change
+    page_change = false;
+  }else{
+    
+  }
 }
 
 void pages(int num){
@@ -141,17 +191,13 @@ void pages(int num){
 }
 
 
-int size8(int x){
-  return 8*x;
-}
-
 void setup()
 {
   Serial.begin(115200);
 
   //Co2 sensor
   Wire.begin();
-  sensor.begin(Wire, SCD41_I2C_ADDR_62);
+  sensor.begin(Wire, 0x77);
 
   //wait for Serial to start
   while(Serial.available()){
@@ -163,7 +209,9 @@ void setup()
   display.setTextColor(GxEPD_BLACK);
   display.clearScreen();
   display.fillScreen(GxEPD_WHITE); 
-
+  display.setCursor(8,24);
+ display.printf("%Hello World");
+ display.display();
   delay(2000);
 };
 
@@ -172,7 +220,8 @@ void setup()
 void loop() {
 
   if(page_current!=page_mem){
-    page_change = true;  
+    page_change = true;
+    pages(page_current); 
   }
   
   //runs per a second 
@@ -190,6 +239,8 @@ void loop() {
         Serial.println(errorMessage);
         return;
     }
+
+    page_current++;
   }
   
   //runs every 30 seconds
