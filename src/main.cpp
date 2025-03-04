@@ -1,5 +1,5 @@
 #include <GxEPD2_BW.h>
-#include <Fonts/FreeMonoBoldOblique24pt7b.h>
+#include <Fonts/FreeMonoBold24pt7b.h>
 // select the display class and display driver class in the following file (new style):
 #include "GxEPD2_display_selection_new_style.h"
 #include <SensirionI2cScd4x.h>
@@ -23,18 +23,26 @@ GxEPD2_DISPLAY_CLASS<GxEPD2_DRIVER_CLASS, GxEPD2_420_GDEY042T81::HEIGHT> display
 
 int count = 0; //test for display
 int64_t sec = 0; //current uptime second
-int page_mem = 0,page_current = 0; //page
+int page_mem = 0,page_num = 1; //page
 bool page_change = false; //page state change
 bool dataReady = false;
-uint16_t co2Concentration = 0;
-float temperature = 0.0;
-float relativeHumidity = 0.0;
-
+uint16_t co2 = 0;
+float raw_temp = 0.0;
+float raw_humidity = 0.0;
+int temp = 0;
+int humidity = 0;
 
 int by8(int x){
   return 8*x;
 }
 
+float toFahrenheit(float c){
+  return (c * 9/5) + 32; 
+}
+void clearPage(){
+  display.fillScreen(GxEPD_WHITE);
+  display.nextPage();
+}
 
 void getSensorData(){
    error = sensor.getDataReadyStatus(dataReady);
@@ -59,13 +67,16 @@ void getSensorData(){
     // is required, you should call the respective functions here.
     // Check out the header file for the function definition.
     error =
-        sensor.readMeasurement(co2Concentration, temperature, relativeHumidity);
+        sensor.readMeasurement(co2, raw_temp, raw_humidity);
     if (error != NO_ERROR) {
         Serial.print("Error trying to execute readMeasurement(): ");
         errorToString(error, errorMessage, sizeof errorMessage);
         Serial.println(errorMessage);
         return;
     }
+
+    temp =round(toFahrenheit(raw_temp)); //convert and round to the nearest int
+    humidity = round(raw_humidity); 
 }
 
 //Makes sure the sensor is fully functioning 
@@ -100,7 +111,7 @@ void co2Init(){
         return;
     }
 
-    // If temperature offset and/or sensor altitude compensation
+    // If temp offset and/or sensor altitude compensation
     // is required, you should call the respective functions here.
     // Check out the header file for the function definitions.
     // Start periodic measurements (5sec interval)
@@ -113,22 +124,27 @@ void co2Init(){
     }
 }
 
+
+/*
 void page1(){
+    getSensorData();
+    Serial.printf("t:%d h:%d c:%d\n",temp, humidity, co2);
   if(page_change){
+    clearPage();
     display.setCursor(by8(1),by8(6));
     display.printf("Temp: ");
     display.setCursor(by8(12), by8(6));
-    display.printf("%f C",temperature);
+    display.printf("%f C",temp);
     
     display.setCursor(by8(1),by8(6*2));
     display.printf("Humidity: ");
     display.setCursor(by8(12), by8(6*2));
-    display.printf("%f %",relativeHumidity);
+    display.printf("%f %",humidity);
 
     display.setCursor(by8(1),by8(6*3));
     display.printf("CO2");
     display.setCursor(by8(12), by8(6*2));
-    display.printf("%d ppm",co2Concentration);
+    display.printf("%d ppm",co2);
 
     display.display();
     //locks in page after change
@@ -138,44 +154,81 @@ void page1(){
 
     display.setPartialWindow(by8(12), by8(6), display.width()-by8(12), by8(6));
     display.setCursor(by8(12), by8(6));
-    display.printf("%f C",temperature);
+    display.printf("%f C",temp);
 
     display.setPartialWindow(by8(12), by8(6*2), display.width()-by8(12), by8(6));
     display.setCursor(by8(12), by8(6*2));
-    display.printf("%f %",relativeHumidity);
+    display.printf("%f %",humidity);
 
     display.setPartialWindow(by8(12), by8(6*3), display.width()-by8(12), by8(6));
     display.setCursor(by8(12), by8(6*3));
-    display.printf("%d ppm",co2Concentration);
+    display.printf("%d ppm",co2);
 
     display.nextPage();
     
   }
 }
+*/
+
+void page1(){
+  Serial.printf("temp:%d\n",temp);
+  if(page_change){
+    clearPage();
+    display.setCursor(by8(1),by8(6));
+    display.printf("Page 1");
+    display.setCursor(by8(1),by8(6*2));
+    display.printf("Temp:%dF",temp);
+    
+  }else{
+    display.fillRect(0,by8(8),display.width(),by8(7),GxEPD_WHITE);
+    display.setCursor(by8(1),by8(6*2));
+    display.printf("Temp:%dF",temp);
+    
+  }
+}
 
 void page2(){
+  Serial.printf("Humidity: %d%\n",humidity);
   if(page_change){
+    clearPage();
     display.setCursor(by8(1),by8(6));
     display.printf("Page 2");
-    //locks in page after change
-    page_change = false;
-  }else{
+    display.setCursor(by8(1),by8(6*2));
+    display.printf("Humidity:%d %",humidity);
     
+  }else{
+    display.fillRect(0,by8(8),display.width(),by8(7),GxEPD_WHITE);
+    display.setCursor(by8(1),by8(6*2));
+    display.printf("Humidity:%d %",humidity);
   }
 }
 
 void page3(){
+  Serial.printf("CO2:%d\n",co2);
   if(page_change){
+    clearPage();
     display.setCursor(by8(1),by8(6));
     display.printf("Page 3");
-    //locks in page after change
-    page_change = false;
-  }else{
+    display.setCursor(by8(1),by8(6*2));
+    display.printf("CO2:%d",co2);
     
+  }else{
+    display.fillRect(0,by8(8),display.width(),by8(7),GxEPD_WHITE);
+    display.setCursor(by8(1),by8(6*2));
+    display.printf("CO2:%d",co2);
   }
 }
 
 void pages(int num){
+  //first check if the page number is valid if not then adjust it
+  if(page_num > 3){
+    page_num = 1;
+  }
+
+  if(page_num < 1){
+    page_num = 3;
+  }
+
   switch (num){
     case 1:
       page1();
@@ -186,8 +239,14 @@ void pages(int num){
     case 3:
       page3();
       break;
+    default:
+      page1();
+      break;
   }
-
+  //locks in page after change
+  page_change = false;
+  display.nextPage();
+  page_mem = page_num;
 }
 
 
@@ -197,7 +256,8 @@ void setup()
 
   //Co2 sensor
   Wire.begin();
-  sensor.begin(Wire, 0x77);
+  sensor.begin(Wire, SCD41_I2C_ADDR_62);
+  co2Init();
 
   //wait for Serial to start
   while(Serial.available()){
@@ -205,47 +265,37 @@ void setup()
   }  
 
   display.init(115200, true, 2, false); // USE THIS for Waveshare boards with "clever" reset circuit, 2ms reset pulse
-  display.setFont(&FreeMonoBoldOblique24pt7b);
+  display.setFont(&FreeMonoBold24pt7b);
   display.setTextColor(GxEPD_BLACK);
   display.clearScreen();
   display.fillScreen(GxEPD_WHITE); 
-  display.setCursor(8,24);
- display.printf("%Hello World");
- display.display();
+  display.display();
+  display.setPartialWindow(0,0,display.width(),display.height());
+
   delay(2000);
 };
 
 
-
 void loop() {
-
-  if(page_current!=page_mem){
+  if(page_num!=page_mem){
     page_change = true;
-    pages(page_current); 
   }
-  
+
   //runs per a second 
   if(sec!=rtc.getSecond())
   {
     sec=rtc.getSecond();
   }
-
-  //runs every 15 seconds
-  if(sec%15==0){
-    error = sensor.getDataReadyStatus(dataReady);
-    if (error != NO_ERROR) {
-        Serial.print("Error trying to execute getDataReadyStatus(): ");
-        errorToString(error, errorMessage, sizeof errorMessage);
-        Serial.println(errorMessage);
-        return;
-    }
-
-    page_current++;
-  }
   
+  //runs every 15 seconds
+  if(sec%5==0||page_change){
+    getSensorData();
+     pages(page_num);
+  
+  }    
+    
   //runs every 30 seconds
   if(sec%30==0){
-   
+     page_num++;
   }
-
 };
