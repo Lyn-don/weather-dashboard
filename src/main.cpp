@@ -1,5 +1,6 @@
 #include <GxEPD2_BW.h>
 #include <Fonts/FreeMonoBold24pt7b.h>
+#include <Fonts/FreeMonoBold12pt7b.h>
 // select the display class and display driver class in the following file (new style):
 #include "GxEPD2_display_selection_new_style.h"
 #include <SensirionI2cScd4x.h>
@@ -31,6 +32,8 @@ float raw_temp = 0.0;
 float raw_humidity = 0.0;
 int temp = 0;
 int humidity = 0;
+int width_center = (int)(display.width()/2);
+int height_center = (int)(display.height()/2);
 
 int by8(int x){
   return 8*x;
@@ -124,64 +127,65 @@ void co2Init(){
     }
 }
 
-
-/*
-void page1(){
-    getSensorData();
-    Serial.printf("t:%d h:%d c:%d\n",temp, humidity, co2);
-  if(page_change){
-    clearPage();
-    display.setCursor(by8(1),by8(6));
-    display.printf("Temp: ");
-    display.setCursor(by8(12), by8(6));
-    display.printf("%f C",temp);
-    
-    display.setCursor(by8(1),by8(6*2));
-    display.printf("Humidity: ");
-    display.setCursor(by8(12), by8(6*2));
-    display.printf("%f %",humidity);
-
-    display.setCursor(by8(1),by8(6*3));
-    display.printf("CO2");
-    display.setCursor(by8(12), by8(6*2));
-    display.printf("%d ppm",co2);
-
-    display.display();
-    //locks in page after change
-    page_change = false;
-  }else{
-    display.fillScreen(GxEPD_WHITE);
-
-    display.setPartialWindow(by8(12), by8(6), display.width()-by8(12), by8(6));
-    display.setCursor(by8(12), by8(6));
-    display.printf("%f C",temp);
-
-    display.setPartialWindow(by8(12), by8(6*2), display.width()-by8(12), by8(6));
-    display.setCursor(by8(12), by8(6*2));
-    display.printf("%f %",humidity);
-
-    display.setPartialWindow(by8(12), by8(6*3), display.width()-by8(12), by8(6));
-    display.setCursor(by8(12), by8(6*3));
-    display.printf("%d ppm",co2);
-
-    display.nextPage();
-    
-  }
+void centerJustifiedText(int x, int y, char text[], int font_size = 12){
+  int text_width = (strlen(text)+1) * font_size;
+  x = (int)(x-(text_width/2));
+  display.setCursor(x-3,y);
+  //Serial.printf("%d %d %d\n" , text_width, text_width , strlen(text) );
+  display.printf("%s",text);
 }
-*/
+
+void centerJustifiedRect(int x ,int y, int width = 0, int height = 0, int16_t color = GxEPD_BLACK){
+  display.fillRoundRect(x-(int)round(width/2), y, width, height, by8(1), color);
+}
+
+
+void pageTurnBar(int turn_num){
+
+}
+
+
+void pageBorder(char title[], char name_left[], char name_right[]){
+  int title_size =0,name_left_size =0,name_right_size=0;
+  title_size = strlen(title);
+  name_left_size = strlen(name_left);
+  name_right_size = strlen(name_right);
+  int font_size = 12; //default 12
+  
+  int border_padding = 1;
+  display.setTextColor(GxEPD_BLACK);
+  display.setFont(&FreeMonoBold12pt7b);
+
+  //TOP
+  //page title
+  centerJustifiedText(width_center,by8(2),title);
+
+  //BOTTOM
+  centerJustifiedText(50,display.height() - by8(1), name_left);
+  centerJustifiedText(350,display.height() - by8(1), name_right);
+  
+  //reset to normal text mode
+  display.setFont(&FreeMonoBold24pt7b);
+  display.setTextColor(GxEPD_BLACK);
+}
 
 void page1(){
   Serial.printf("temp:%d\n",temp);
+
   if(page_change){
     clearPage();
-    display.setCursor(by8(1),by8(6));
-    display.printf("Page 1");
-    display.setCursor(by8(1),by8(6*2));
+    display.fillRect(width_center,0,1,display.height(),GxEPD_BLACK);
+
+    pageBorder("Inside","Puzzle","Outside");
+    display.setCursor(by8(1),by8(8));
+    display.printf("Temp");
+    display.setCursor(by8(1),by8(16));
     display.printf("Temp:%dF",temp);
     
   }else{
-    display.fillRect(0,by8(8),display.width(),by8(7),GxEPD_WHITE);
-    display.setCursor(by8(1),by8(6*2));
+    pageBorder("Inside","Puzzle","Outside");
+    display.fillRect(0,by8(9),display.width(),by8(9),GxEPD_WHITE);
+    display.setCursor(by8(1),by8(16));
     display.printf("Temp:%dF",temp);
     
   }
@@ -267,8 +271,11 @@ void setup()
   display.init(115200, true, 2, false); // USE THIS for Waveshare boards with "clever" reset circuit, 2ms reset pulse
   display.setFont(&FreeMonoBold24pt7b);
   display.setTextColor(GxEPD_BLACK);
+  display.setTextWrap(false);
   display.clearScreen();
   display.fillScreen(GxEPD_WHITE); 
+  
+  display.display();
   display.display();
   display.setPartialWindow(0,0,display.width(),display.height());
 
@@ -296,6 +303,6 @@ void loop() {
     
   //runs every 30 seconds
   if(sec%30==0){
-     page_num++;
+     //page_num++;
   }
 };
