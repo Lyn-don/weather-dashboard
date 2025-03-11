@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include <GxEPD2_BW.h>
 #include <Fonts/FreeMonoBold24pt7b.h>
 #include <Fonts/FreeMonoBold12pt7b.h>
@@ -6,6 +7,10 @@
 #include <SensirionI2cScd4x.h>
 #include <Wire.h>
 #include <ESP32Time.h>
+#include <WiFiManager.h>
+#include "logo.c"
+#include "weather_icons.c"
+//const unsigned char* logo = weather_mate_logo;
 
 // macro definitions
 // make sure that we use the proper definition of NO_ERROR
@@ -22,18 +27,25 @@ ESP32Time rtc(0);//RTC class
 //main display class for Weact 4.2 inch e-paper screen
 GxEPD2_DISPLAY_CLASS<GxEPD2_DRIVER_CLASS, GxEPD2_420_GDEY042T81::HEIGHT> display(GxEPD2_DRIVER_CLASS(/*CS=5*/ 5, /*DC=*/ 1, /*RST=*/ 0, /*BUSY=*/ 6)); // ESP32-C3 Super Mini
 
-int count = 0; //test for display
+//int count = 0; //test for display
 int64_t sec = 0; //current uptime second
+
 int page_mem = 0,page_num = 1; //page
 bool page_change = false; //page state change
-bool dataReady = false;
-uint16_t co2 = 0;
-float raw_temp = 0.0;
-float raw_humidity = 0.0;
-int temp = 0;
-int humidity = 0;
-int width_center = (int)(display.width()/2);
-int height_center = (int)(display.height()/2);
+
+bool dataReady = false;//hold the status of the co2 sensor is ready to be polled
+
+float raw_temp = 0.0;//holds the given data from the sensor
+float raw_humidity = 0.0;//holds the given data from the sensor
+uint16_t co2 = 0;//sensor data after formating 
+int temp = 0;//sensor data after formating 
+int humidity = 0;//sensor data after formating 
+
+int width_center = (int)(display.width()/2);//x axis center of display
+int height_center = (int)(display.height()/2);//y axis center of display
+
+long seed = esp_random();//random given seed from esp
+char buffer[100]; //buffer to convert numbers to char arrays
 
 int by8(int x){
   return 8*x;
@@ -158,7 +170,8 @@ void pageBorder(char title[], char name_left[], char name_right[]){
 
   //TOP
   //page title
-  centerJustifiedText(width_center,by8(2),title);
+  centerJustifiedText(width_center,display.height()-by8(1),title);
+  //display.fillRect(0,0,display.width(),by8(1),GxEPD_BLACK);
 
   //BOTTOM
   centerJustifiedText(50,display.height() - by8(1), name_left);
@@ -174,19 +187,34 @@ void page1(){
 
   if(page_change){
     clearPage();
-    display.fillRect(width_center,0,1,display.height(),GxEPD_BLACK);
-
     pageBorder("Inside","Puzzle","Outside");
-    display.setCursor(by8(1),by8(8));
-    display.printf("Temp");
-    display.setCursor(by8(1),by8(16));
-    display.printf("Temp:%dF",temp);
+    //draw images first!
+    display.drawBitmap(by8(4),0,thermometer_75,75,75,GxEPD_WHITE,GxEPD_BLACK);
+    display.drawBitmap(by8(4),100,rain_75,75,75,GxEPD_WHITE,GxEPD_BLACK);
+    display.drawBitmap(by8(4),200,co2_2_75,75,75,GxEPD_WHITE,GxEPD_BLACK);
+
+    display.setCursor(width_center,by8(6));
+    display.printf("%dF",temp);
+    display.setCursor(width_center,by8(6)+100);
+    display.printf("%d%%",humidity);
+    display.setCursor(width_center,by8(6)+200);
+    display.printf("%dppm",co2);
     
   }else{
     pageBorder("Inside","Puzzle","Outside");
-    display.fillRect(0,by8(9),display.width(),by8(9),GxEPD_WHITE);
-    display.setCursor(by8(1),by8(16));
-    display.printf("Temp:%dF",temp);
+    //draw images first!
+    display.drawBitmap(by8(4),0,thermometer_75,75,75,GxEPD_WHITE,GxEPD_BLACK);
+    display.drawBitmap(by8(4),100,rain_75,75,75,GxEPD_WHITE,GxEPD_BLACK);
+    display.drawBitmap(by8(4),200,co2_2_75,75,75,GxEPD_WHITE,GxEPD_BLACK);
+    
+    display.fillRect(width_center,0,display.width(),display.height()-by8(3),GxEPD_WHITE);
+  
+    display.setCursor(width_center,by8(6));
+    display.printf("%dF",temp);
+    display.setCursor(width_center,by8(6)+100);
+    display.printf("%d%%",humidity);
+    display.setCursor(width_center,by8(6)+200);
+    display.printf("%dppm",co2);
     
   }
 }
@@ -253,6 +281,33 @@ void pages(int num){
   page_mem = page_num;
 }
 
+void loadingAnimation(int time_by_750){
+  int x = display.getCursorX();
+  int y = display.getCursorY();
+
+  char loading_dots[4][4] = {"",".","..","..."};
+  int j = 0;
+  for(int i = 0 ; time_by_750 > i; i+=1000){
+    display.fillRect(0,275-24,display.width(),40,GxEPD_WHITE);
+    display.setCursor(50,275);
+    display.print("loading");
+    
+    display.setCursor(240,275);
+    display.print(loading_dots[j]);
+    j++;
+    if(j>3){
+      j=0;
+    }
+    delay(1000);
+    display.nextPage();
+  }
+
+  display.setCursor(x,y);
+}
+
+void connectToWifi(){
+
+}
 
 void setup()
 {
@@ -274,12 +329,13 @@ void setup()
   display.setTextWrap(false);
   display.clearScreen();
   display.fillScreen(GxEPD_WHITE); 
-  
   display.display();
-  display.display();
+  //display.drawBitmap(0,70,weather_mate_logo_large,400,160,GxEPD_WHITE,GxEPD_BLACK);
+  //display.display();
   display.setPartialWindow(0,0,display.width(),display.height());
-
-  delay(2000);
+  //int r = rand()%6+3;
+  //loadingAnimation(r*1000);
+/**/
 };
 
 
@@ -297,6 +353,7 @@ void loop() {
   //runs every 15 seconds
   if(sec%5==0||page_change){
     getSensorData();
+    page_num = 2;
      pages(page_num);
   
   }    
