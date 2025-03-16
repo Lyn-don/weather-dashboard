@@ -323,6 +323,21 @@ void setup()
     delay(100);
   }  
 
+  //Wifi
+  WiFi.mode(WIFI_STA);
+  bool res;
+  WiFiManager wm;
+  wm.resetSettings();
+  res = wm.autoConnect("WeatherMateAP","1234567890"); // anonymous ap
+  if(!res) {
+    Serial.println("Failed to connect");
+    // ESP.restart();
+  } 
+  else {
+    //if you get here you have connected to the WiFi    
+    Serial.println("connected...yeey :)");
+  }
+
   display.init(115200, true, 2, false); // USE THIS for Waveshare boards with "clever" reset circuit, 2ms reset pulse
   display.setFont(&FreeMonoBold24pt7b);
   display.setTextColor(GxEPD_BLACK);
